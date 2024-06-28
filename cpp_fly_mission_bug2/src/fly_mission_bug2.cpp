@@ -165,13 +165,16 @@ namespace mission
                     std::cout << "state:" << state << '\n';
 
                     sleep_for(std::chrono::milliseconds(1000));     //chvili pockat, aby se dron plne zastavil
-                    avoid_right = depthValue_right > depthValue_left;   //promenna pro rozhodnuti smeru vyhybani
+                    avoid_right1 = depthValue_right > depthValue_left;
+                    if(flag_distance_avoid){
+                        avoid_right2 = depthValue_right > depthValue_left;   //promenna pro rozhodnuti smeru vyhybani
+                    }                                                       //pri detekci prekazky se nastavi a zustane stejna az vraceni se na puvodni trajektorii
                     state++;
 
                 case 2:
                     std::cout << "state:" << state << '\n';
 
-                    if(avoid_right){
+                    if(avoid_right1){
                         std::cout << "Going righthand.\n";
                     }else{
                         std::cout << "Going leftthand.\n";
@@ -181,7 +184,7 @@ namespace mission
                 case 3:
                     std::cout << "state:" << state << '\n';
 
-                    if(avoid_right){
+                    if(avoid_right1){
                         _offboard.get()->set_velocity_body({0.0f, 0.0f, 0.0f, 45.0f});  //otoceni po smeru hodin, 45 stupnu/s
                         sleep_for(std::chrono::milliseconds(2000));     // -> otoceni o 90 stupnu
                         state++;
@@ -194,7 +197,7 @@ namespace mission
                 case 4:
                     std::cout << "state:" << state << '\n';
 
-                    if(avoid_right){
+                    if(avoid_right2){
                         _offboard.get()->set_velocity_body({3.0f, 0.0f, 0.0f, -40.0f}); //let dopredu s otacenim
                     }else{
                         _offboard.get()->set_velocity_body({3.0f, 0.0f, 0.0f, 40.0f});
@@ -286,8 +289,8 @@ namespace mission
     {
         std::cout << "Creating and uploading mission\n";
 
-        trasa = 1;
-        //trasa = 2;
+        //trasa = 1;
+        trasa = 2;
         //trasa = 3;
 
         if(trasa == 1){
@@ -336,7 +339,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.4130,
                 -121.9984,
-                14.3f,
+                14.4f,
                 5.0f,
                 false,
                 -90.0f,
@@ -346,7 +349,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.4129,
                 -121.9996,
-                14.3f,
+                14.4f,
                 5.0f,
                 false,
                 -90.0f,
@@ -356,7 +359,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.4135,
                 -121.99925,
-                14.3f,
+                14.4f,
                 5.0f,
                 false,
                 -90.0f,
