@@ -34,11 +34,7 @@ namespace mission
         rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 
-        //declare_parameter("connection", "udp://:14541");
-
         _mavsdk = std::make_unique<mavsdk::Mavsdk>();
-
-        //auto connection = get_parameter("udp://:14541").as_string();
 
         mavsdk::ConnectionResult connectionResult = _mavsdk.get()->add_any_connection("udp://:14541");
 
@@ -71,7 +67,6 @@ namespace mission
 
     void FlyMission::cbDepth(const sensor_msgs::msg::Image::SharedPtr msg) 
     {
-        //RCLCPP_INFO(this->get_logger(), "Received depth image with height: %d, width: %d", msg->height, msg->width);
         width = msg->width;
         height = msg->height;
         uint32_t x_center = width/2;
@@ -101,7 +96,7 @@ namespace mission
             flag_avoid = true;   
         }
 
-        if(flag_distance_avoid && (distance_avoid > 0.5) && (distance_to_line < 0.1)){
+        if((state == 4) && (distance_avoid > 0.5) && (distance_to_line < 0.1)){      //po vraceni na puvodni trajektorii pokracuje v letu k waypointu
             state = 5;
             flag_avoid = true;
         }
@@ -109,56 +104,33 @@ namespace mission
 
     void FlyMission::position()
     {
-        //std::cout << "waypoint:" << waypoint << '\n';
-        //std::cout << "drone_start_latitude:" << drone_start_pos.latitude_deg << '\n';
-        //std::cout << "drone_start_longitude:" << drone_start_pos.longitude_deg << '\n';
-
         drone_pos = _telemetry->position();
         drone_latitude = drone_pos.latitude_deg;     //aktualni zem. sirka dronu
         drone_longitude = drone_pos.longitude_deg;   //aktualni zem. vyska dronu
 
-        //p1 = {last_waypoint_latitude*(M_PI/180.0), last_waypoint_longitude*(M_PI/180.0)};
-        //p2 = {next_waypoint_latitude*(M_PI/180.0), next_waypoint_longitude*(M_PI/180.0)};
         p_d = {drone_latitude*(M_PI/180.0), drone_longitude*(M_PI/180.0)};
 
-        //double R = 6371000;
-        //float x1 = R*std::cos(p1[0])*std::cos(p1[1]);
-        //float y1 = R*std::cos(p1[0])*std::sin(p1[1]);
-        //float x2 = R*std::cos(p2[0])*std::cos(p2[1]);
-        //float y2 = R*std::cos(p2[0])*std::sin(p2[1]);
         x_d = R*std::cos(p_d[0])*std::cos(p_d[1]);
         y_d = R*std::cos(p_d[0])*std::sin(p_d[1]);
-/*
-        float citatel = std::fabs((x2-x1)*(y_d-y1) - (x_d-x1)*(y2-y1));
-        float jmenovatel = std::sqrt(std::pow(x2-x1,2)+std::pow(y2-y1,2));
-        distance_to_line = citatel/jmenovatel;            //vzdalenost dronu od cary
-        std::cout << "distance_to_line:" << distance_to_line << '\n';
-*/
+
         float citatel = std::fabs((next_waypoint_latitude-last_waypoint_latitude)*(drone_longitude-last_waypoint_longitude)-(drone_latitude-last_waypoint_latitude)*(next_waypoint_longitude-last_waypoint_longitude));
         float jmenovatel = std::sqrt(std::pow(next_waypoint_latitude-last_waypoint_latitude,2)+std::pow(next_waypoint_longitude-last_waypoint_longitude,2));
         distance_to_line = (citatel/jmenovatel)*10000;      //vzdalenost dronu od cary
+
         std::cout << "distance_to_line:" << distance_to_line << '\n';
 
         drone_x_norm = x_d + 2681500;
         drone_y_norm = y_d + 4291460;
 
-        
         drone_avoid_latitude = drone_pos_avoid.latitude_deg;
         drone_avoid_longitude = drone_pos_avoid.longitude_deg;
-        //x = R*std::cos(drone_avoid_latitude*(M_PI/180.0))*std::cos(drone_avoid_longitude*(M_PI/180.0));
-        //y = R*std::cos(drone_latitude*(M_PI/180.0))*std::sin(drone_longitude*(M_PI/180.0));
 
         distance_avoid = (std::sqrt(std::pow(drone_latitude-drone_avoid_latitude,2)+std::pow(drone_longitude-drone_avoid_longitude,2)))*10000; 
-        std::cout << "distance_avoid:" << distance_avoid << '\n';
-        //std::cout << "flag_avoid:" << flag_avoid << '\n';
 
-        //std::cout << "next_waypoint_latitude:" << next_waypoint_latitude << '\n';
-        //std::cout << "next_waypoint_longitude:" << next_waypoint_longitude << '\n';
-        //std::cout << "last_waypoint_latitude:" << last_waypoint_latitude << '\n';
-        //std::cout << "last_waypoint_longitude:" << last_waypoint_longitude << '\n';
-        //std::cout << "drone_latitude:" << drone_latitude << '\n';
+        std::cout << "distance_avoid:" << distance_avoid << '\n';
+        std::cout << "flag_distance_avoid:" << flag_distance_avoid << '\n';
+
         //std::cout << "drone_x norm:" << drone_x_norm << '\n';
-        //std::cout << "drone_longitude:" << drone_longitude << '\n';
         //std::cout << "drone_y norm:" << drone_y_norm << '\n';
     }
 
@@ -184,7 +156,9 @@ namespace mission
             switch(state){
                 case 0:
                     std::cout << "state:" << state << '\n';
-                    drone_pos_avoid = _telemetry->position();   //pocatecni pozice pri uhybani
+                    if(flag_distance_avoid){
+                        drone_pos_avoid = _telemetry->position();   //pocatecni pozice pri uhybani
+                    }
                     state++;
                 
                 case 1:
@@ -227,8 +201,8 @@ namespace mission
                     }
                     
                     flag_avoid = false;
-                    flag_distance_avoid = true;
-                    distance_avoid = 0;  
+                    flag_distance_avoid = false;
+                    distance_avoid = 0;
                     depthValue_center = 20;
                     depthValue_left = 20;
                     depthValue_right = 20;
@@ -265,7 +239,7 @@ namespace mission
                     }
 
                     flag_avoid = false;
-                    flag_distance_avoid = false;
+                    flag_distance_avoid = true;
                     break;
             }
         }
@@ -305,7 +279,6 @@ namespace mission
         mavsdk::Mission::Result start_mission_result = _mission.get()->start_mission();     //start mise
         if (start_mission_result != mavsdk::Mission::Result::Success) {
             std::cerr << "Starting mission failed: " << start_mission_result << '\n';
-            //return 1;
         }
     }
 
