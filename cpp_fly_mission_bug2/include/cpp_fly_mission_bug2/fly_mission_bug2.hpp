@@ -58,8 +58,6 @@ namespace mission
         std::atomic<float> drone_latitude;
         std::atomic<float> drone_longitude;
 
-        std::vector<float> p1;
-        std::vector<float> p2;
         std::vector<float> p_d;
 
         std::atomic<float> x_d;
@@ -82,14 +80,12 @@ namespace mission
         int state = 0;
         double R = 6371000;
         bool avoid_right;
-        float x;
-        float y;
         mavsdk::Telemetry::Position drone_pos_avoid;
         float drone_avoid_latitude;
         float drone_avoid_longitude;
         float distance_avoid = 0;
         bool flag_avoid = false;
-        bool flag_distance_avoid = false;
+        bool flag_distance_avoid = true;
         int trasa;
 
         rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr _srvUpload;
