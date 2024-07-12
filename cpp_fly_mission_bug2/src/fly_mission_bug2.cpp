@@ -90,7 +90,7 @@ namespace mission
         depth_threshold_center = 10;
         depth_threshold_side = 5;
  
-        if(in_air && (depthValue_center < depth_threshold_center || depthValue_left < depth_threshold_side || depthValue_right < depth_threshold_side)){ 
+        if(in_air && (state != 5) && (depthValue_center < depth_threshold_center || depthValue_left < depth_threshold_side || depthValue_right < depth_threshold_side)){ 
             std::cout << "Obstacle detected! Avoiding.\n";
             state = 0;
             flag_avoid = true;   
@@ -167,10 +167,10 @@ namespace mission
                     sleep_for(std::chrono::milliseconds(1000));     //chvili pockat, aby se dron plne zastavil
                     avoid_right1 = depthValue_right > depthValue_left;
                     if(flag_distance_avoid){
-                        avoid_right2 = depthValue_right > depthValue_left;   //promenna pro rozhodnuti smeru vyhybani
-                    }                                                       //pri detekci prekazky se nastavi a zustane stejna az vraceni se na puvodni trajektorii
-                    state++;
-
+                        avoid_right2 = depthValue_right > depthValue_left;   //promenne pro rozhodnuti smeru vyhybani
+                    }                                                        //1: nastavi se pokazde
+                    state++;                                                 //2: pri detekci prekazky se nastavi a zustane stejna az do vraceni se na puvodni trajektorii
+                                                                             //   (po stavu 4 se nemeni)
                 case 2:
                     std::cout << "state:" << state << '\n';
 
@@ -290,8 +290,8 @@ namespace mission
         std::cout << "Creating and uploading mission\n";
 
         //trasa = 1;
-        trasa = 2;
-        //trasa = 3;
+        //trasa = 2;
+        trasa = 3;
 
         if(trasa == 1){
             mission_items.push_back(make_mission_item(
@@ -371,7 +371,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.41335,
                 -121.9995,
-                14.3f,
+                14.6f,
                 5.0f,
                 false,
                 -90.0f,
