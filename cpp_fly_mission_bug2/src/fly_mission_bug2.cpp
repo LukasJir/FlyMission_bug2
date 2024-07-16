@@ -63,6 +63,9 @@ namespace mission
         _srvTakeOff = this->create_service<std_srvs::srv::Trigger>("mission_flier/take_off", std::bind(&FlyMission::cbTakeOff, this, _1, _2));
         _srvStartMission = this->create_service<std_srvs::srv::Trigger>("mission_flier/start_mission", std::bind(&FlyMission::cbStartMission, this, _1, _2));
         _depthSub = this->create_subscription<sensor_msgs::msg::Image>("/depth_camera", 10, std::bind(&FlyMission::cbDepth, this, _1));
+
+        
+        //std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
     }
 
     void FlyMission::cbDepth(const sensor_msgs::msg::Image::SharedPtr msg) 
@@ -108,19 +111,14 @@ namespace mission
         drone_latitude = drone_pos.latitude_deg;     //aktualni zem. sirka dronu
         drone_longitude = drone_pos.longitude_deg;   //aktualni zem. vyska dronu
 
-        p_d = {drone_latitude*(M_PI/180.0), drone_longitude*(M_PI/180.0)};
-
-        x_d = R*std::cos(p_d[0])*std::cos(p_d[1]);
-        y_d = R*std::cos(p_d[0])*std::sin(p_d[1]);
-
         float citatel = std::fabs((next_waypoint_latitude-last_waypoint_latitude)*(drone_longitude-last_waypoint_longitude)-(drone_latitude-last_waypoint_latitude)*(next_waypoint_longitude-last_waypoint_longitude));
         float jmenovatel = std::sqrt(std::pow(next_waypoint_latitude-last_waypoint_latitude,2)+std::pow(next_waypoint_longitude-last_waypoint_longitude,2));
         distance_to_line = (citatel/jmenovatel)*10000;      //vzdalenost dronu od cary
 
         std::cout << "distance_to_line:" << distance_to_line << '\n';
 
-        drone_x_norm = x_d + 2681500;
-        drone_y_norm = y_d + 4291460;
+        drone_lat_norm = (drone_latitude - 37.4130)*100000;     //souradnice dronu pro vykresleni do grafu
+        drone_lon_norm = (drone_longitude + 121.9993)*100000;
 
         drone_avoid_latitude = drone_pos_avoid.latitude_deg;
         drone_avoid_longitude = drone_pos_avoid.longitude_deg;
@@ -128,10 +126,30 @@ namespace mission
         distance_avoid = (std::sqrt(std::pow(drone_latitude-drone_avoid_latitude,2)+std::pow(drone_longitude-drone_avoid_longitude,2)))*10000; 
 
         std::cout << "distance_avoid:" << distance_avoid << '\n';
-        std::cout << "flag_distance_avoid:" << flag_distance_avoid << '\n';
+        
+        std::cout << "drone_lat norm:" << std::fixed << std::setprecision(3) << drone_lat_norm << '\n';
+        std::cout << "drone_lon norm:" << std::fixed << std::setprecision(3) << drone_lon_norm << '\n';
 
-        //std::cout << "drone_x norm:" << drone_x_norm << '\n';
-        //std::cout << "drone_y norm:" << drone_y_norm << '\n';
+        static double lat1 = drone_pos.latitude_deg;
+        static double lon1 = drone_pos.longitude_deg;
+
+        double lat2 = drone_pos.latitude_deg;
+        double lon2 = drone_pos.latitude_deg;
+
+        double fi1 = lat1*M_PI/180.0;
+        double fi2 = lat2*M_PI/180.0;
+        double delta_fi = (lat2 - lat1)*M_PI/180.0;
+        double delta_lam = (lon2 - lon1)*M_PI/180.0;
+
+        double a = std::sin(delta_fi/2)*std::sin(delta_fi/2) + std::cos(fi1)*std::cos(fi2)*std::sin(delta_lam/2)*std::sin(delta_lam/2);
+        double c = 2*std::atan2(std::sqrt(a), std::sqrt(1 - a));
+
+        total_distance += R*c;
+
+        std::cout << "total_distance:" << total_distance << '\n';
+
+        lat1 = lat2;
+        lon1 = lon2;
     }
 
     void FlyMission::avoid()
@@ -251,6 +269,9 @@ namespace mission
     void FlyMission::cbStartMission(const std::shared_ptr<std_srvs::srv::Trigger::Request> aRequest, const std::shared_ptr<std_srvs::srv::Trigger::Response> aResponse)
     {
         std::atomic<bool> want_to_pause{false};
+
+        start_time_ = std::chrono::steady_clock::now();     //pocatecni cas
+
         // Before starting the mission, we want to be sure to subscribe to the mission progress.
         _mission.get()->subscribe_mission_progress([this, &want_to_pause](mavsdk::Mission::MissionProgress mission_progress) {
             std::cout << "Mission status update: " << mission_progress.current << " / "
@@ -260,6 +281,13 @@ namespace mission
                 // We can only set a flag here. If we do more request inside the callback,
                 // we risk blocking the system.
                 want_to_pause = true;
+            }
+
+            if (mission_progress.current == mission_progress.total) {
+                end_time_ = std::chrono::steady_clock::now();   //koncovy cas
+
+                auto flight_duration = std::chrono::duration_cast<std::chrono::seconds>(end_time_ - start_time_);   //celkovy cas
+                std::cout << "Flight duration: " << flight_duration.count() << " seconds\n";
             }
 
             waypoint = mission_progress.current;    //index nasledujiciho waypointu
@@ -290,8 +318,8 @@ namespace mission
         std::cout << "Creating and uploading mission\n";
 
         //trasa = 1;
-        //trasa = 2;
-        trasa = 3;
+        trasa = 2;
+        //trasa = 3;
 
         if(trasa == 1){
             mission_items.push_back(make_mission_item(
