@@ -64,8 +64,8 @@ namespace mission
         std::atomic<float> y_d;
         std::atomic<float> distance_to_line;
 
-        std::atomic<float> drone_x_norm;
-        std::atomic<float> drone_y_norm;
+        std::atomic<float> drone_lat_norm;
+        std::atomic<float> drone_lon_norm;
 
         std::atomic<uint32_t> width;
         std::atomic<uint32_t> height;
@@ -88,6 +88,7 @@ namespace mission
         bool flag_avoid = false;
         bool flag_distance_avoid = true;
         int trasa;
+        double total_distance;
 
         rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr _srvUpload;
         void cbUpload(const std::shared_ptr<std_srvs::srv::Trigger::Request> aRequest, const std::shared_ptr<std_srvs::srv::Trigger::Response> aResponse);
@@ -107,5 +108,8 @@ namespace mission
 
         void position();
         void avoid();
+
+        std::chrono::time_point<std::chrono::steady_clock> start_time_;
+        std::chrono::time_point<std::chrono::steady_clock> end_time_;
     };
 }
