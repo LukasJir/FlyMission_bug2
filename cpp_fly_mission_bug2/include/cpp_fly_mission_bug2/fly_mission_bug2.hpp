@@ -75,7 +75,7 @@ namespace mission
 
         bool in_air;
         int state = 0;
-        double R = 6371000;
+        double R = 6371000.0;
         bool avoid_right1;
         bool avoid_right2;
         
