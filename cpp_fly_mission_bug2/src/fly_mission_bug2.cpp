@@ -63,9 +63,6 @@ namespace mission
         _srvTakeOff = this->create_service<std_srvs::srv::Trigger>("mission_flier/take_off", std::bind(&FlyMission::cbTakeOff, this, _1, _2));
         _srvStartMission = this->create_service<std_srvs::srv::Trigger>("mission_flier/start_mission", std::bind(&FlyMission::cbStartMission, this, _1, _2));
         _depthSub = this->create_subscription<sensor_msgs::msg::Image>("/depth_camera", 10, std::bind(&FlyMission::cbDepth, this, _1));
-
-        
-        //std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
     }
 
     void FlyMission::cbDepth(const sensor_msgs::msg::Image::SharedPtr msg) 
@@ -130,23 +127,22 @@ namespace mission
         std::cout << "drone_lat norm:" << std::fixed << std::setprecision(3) << drone_lat_norm << '\n';
         std::cout << "drone_lon norm:" << std::fixed << std::setprecision(3) << drone_lon_norm << '\n';
 
+        //mereni uletene vzdalenosti
         static double lat1 = drone_pos.latitude_deg;
         static double lon1 = drone_pos.longitude_deg;
 
         double lat2 = drone_pos.latitude_deg;
-        double lon2 = drone_pos.latitude_deg;
+        double lon2 = drone_pos.longitude_deg;
 
-        double fi1 = lat1*M_PI/180.0;
-        double fi2 = lat2*M_PI/180.0;
-        double delta_fi = (lat2 - lat1)*M_PI/180.0;
-        double delta_lam = (lon2 - lon1)*M_PI/180.0;
+        double d_x = (lat2 - lat1)*(M_PI/180.0);
+        double d_y = (lon2 - lon1)*(M_PI/180.0);
 
-        double a = std::sin(delta_fi/2)*std::sin(delta_fi/2) + std::cos(fi1)*std::cos(fi2)*std::sin(delta_lam/2)*std::sin(delta_lam/2);
-        double c = 2*std::atan2(std::sqrt(a), std::sqrt(1 - a));
+        double a = std::pow(std::sin(d_x/2),2) + std::cos(lat1*(M_PI/180.0))*std::cos(lat2*(M_PI/180.0))*std::pow(std::sin(d_y/2),2);
+        double b = R*2*std::atan2(std::sqrt(a), std::sqrt(1 - a));
 
-        total_distance += R*c;
+        total_distance += b;
 
-        std::cout << "total_distance:" << total_distance << '\n';
+        std::cout << "total_distance:" << std::fixed << std::setprecision(3) << total_distance << '\n';
 
         lat1 = lat2;
         lon1 = lon2;
@@ -186,9 +182,9 @@ namespace mission
                     avoid_right1 = depthValue_right > depthValue_left;
                     if(flag_distance_avoid){
                         avoid_right2 = depthValue_right > depthValue_left;   //promenne pro rozhodnuti smeru vyhybani
-                    }                                                        //1: nastavi se pokazde
-                    state++;                                                 //2: pri detekci prekazky se nastavi a zustane stejna az do vraceni se na puvodni trajektorii
-                                                                             //   (po stavu 4 se nemeni)
+                    }                                                        //avoid_right1: nastavi se pokazde
+                    state++;                                                 //avoid_right2: pri detekci prekazky se nastavi a zustane stejna az do vraceni se na puvodni trajektorii (po state 4 se nemeni)
+
                 case 2:
                     std::cout << "state:" << state << '\n';
 
@@ -226,8 +222,7 @@ namespace mission
                     distance_avoid = 0;
                     depthValue_center = 20;
                     depthValue_left = 20;
-                    depthValue_right = 20;
-                    
+                    depthValue_right = 20;     
                     break;
 
                 case 5:
@@ -235,12 +230,7 @@ namespace mission
 
                     _offboard.get()->set_velocity_body({0.0f, 0.0f, 0.0f, 0.0f});   //zastaveni dronu po uhybnem manevru, jinak dela zvlastni pohyby
                     sleep_for(std::chrono::milliseconds(1000));
-
-                    if(depthValue_center < depth_threshold_center || depthValue_left < depth_threshold_side || depthValue_right < depth_threshold_side){
-                        _offboard.get()->set_velocity_body({0.0f, 0.0f, 0.0f, 90.0f});  //otoceni o 180 stupnu, aby dron nebyl celem k prekazce
-                        sleep_for(std::chrono::milliseconds(2000)); 
-                    }
-                    
+             
                     state++;
 
                 case 6:
@@ -258,6 +248,7 @@ namespace mission
                     if (start_mission_again_result != mavsdk::Mission::Result::Success) {
                         std::cerr << "Resuming mission failed: " << start_mission_again_result << '\n';
                     }
+                    sleep_for(std::chrono::milliseconds(1000));     //chvili pockat, aby se dron natocil smerem k waypointu
 
                     flag_avoid = false;
                     flag_distance_avoid = true;
@@ -272,14 +263,11 @@ namespace mission
 
         start_time_ = std::chrono::steady_clock::now();     //pocatecni cas
 
-        // Before starting the mission, we want to be sure to subscribe to the mission progress.
         _mission.get()->subscribe_mission_progress([this, &want_to_pause](mavsdk::Mission::MissionProgress mission_progress) {
             std::cout << "Mission status update: " << mission_progress.current << " / "
                     << mission_progress.total << '\n';
 
             if (mission_progress.current >= 2) {
-                // We can only set a flag here. If we do more request inside the callback,
-                // we risk blocking the system.
                 want_to_pause = true;
             }
 
@@ -311,14 +299,16 @@ namespace mission
         if (start_mission_result != mavsdk::Mission::Result::Success) {
             std::cerr << "Starting mission failed: " << start_mission_result << '\n';
         }
+
+        total_distance = 0.0;
     }
 
     void FlyMission::upload()
     {
         std::cout << "Creating and uploading mission\n";
 
-        //trasa = 1;
-        trasa = 2;
+        trasa = 1;
+        //trasa = 2;
         //trasa = 3;
 
         if(trasa == 1){
@@ -497,8 +487,6 @@ namespace mission
         auto prom = std::promise<std::shared_ptr<mavsdk::System>>{};
         auto fut = prom.get_future();
 
-        // We wait for new systems to be discovered, once we find one that has an
-        // autopilot, we decide to use it.
         aMavsdk.subscribe_on_new_system([&aMavsdk, &prom]() {
             auto system = aMavsdk.systems().back();
 
@@ -506,21 +494,17 @@ namespace mission
             {
                 std::cout << "Discovered autopilot\n";
 
-                // Unsubscribe again as we only want to find one system.
                 aMavsdk.subscribe_on_new_system(nullptr);
                 prom.set_value(system);
             }
         });
 
-        // We usually receive heartbeats at 1Hz, therefore we should find a
-        // system after around 3 seconds max, surely.
         if(fut.wait_for(std::chrono::seconds(5)) == std::future_status::timeout)
         {
             std::cerr << "No autopilot found.\n";
             return nullptr;
         }
 
-        // Get discovered system now.
         return fut.get();
     }
 }
