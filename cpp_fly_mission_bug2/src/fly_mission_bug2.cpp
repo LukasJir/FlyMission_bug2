@@ -248,7 +248,7 @@ namespace mission
                     if (start_mission_again_result != mavsdk::Mission::Result::Success) {
                         std::cerr << "Resuming mission failed: " << start_mission_again_result << '\n';
                     }
-                    sleep_for(std::chrono::milliseconds(1000));     //chvili pockat, aby se dron natocil smerem k waypointu
+                    sleep_for(std::chrono::milliseconds(2000));     //chvili pockat, aby se dron natocil smerem k waypointu
 
                     flag_avoid = false;
                     flag_distance_avoid = true;
