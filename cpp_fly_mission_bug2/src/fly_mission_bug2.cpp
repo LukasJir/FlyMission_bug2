@@ -369,7 +369,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.4130,
                 -121.9984,
-                14.4f,
+                14.6f,
                 5.0f,
                 false,
                 -90.0f,
@@ -379,7 +379,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.4129,
                 -121.9996,
-                14.4f,
+                14.6f,
                 5.0f,
                 false,
                 -90.0f,
@@ -388,8 +388,8 @@ namespace mission
 
             mission_items.push_back(make_mission_item(
                 37.4135,
-                -121.99925,
-                14.4f,
+                -121.99923,
+                14.6f,
                 5.0f,
                 false,
                 -90.0f,
@@ -401,7 +401,7 @@ namespace mission
             mission_items.push_back(make_mission_item(
                 37.41335,
                 -121.9995,
-                15.5f,
+                16.7f,
                 5.0f,
                 false,
                 -90.0f,
